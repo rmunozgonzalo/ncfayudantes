@@ -219,12 +219,15 @@
 							if (data !== null) {
 								//console.log(data)
 								var fecha = new Date(data);
-								//console.log("aqui"+fecha.toUTCString())
+								fecha = fecha.toLocaleString('es-CL', { timeZone: 'America/Santiago' })
+								//console.log("aqui"+fecha)
+								/*
 								var minutes = fecha.getUTCMinutes();
 								if(minutes<10){
 									minutes = "0"+minutes;
 								}
 								fecha = fecha.getUTCMonth() + 1 + "/" + fecha.getUTCDate() + "/" + fecha.getUTCFullYear()+" "+fecha.getUTCHours()+":"+minutes;
+								*/
 								return fecha;
 							} else {
 								return "";
@@ -268,11 +271,13 @@
 									"render": function (data) {
 										if (data !== null) {
 											var fecha = new Date(data);
-											var minutes = fecha.getUTCMinutes();
+			                                                                fecha = fecha.toLocaleString('es-CL', { timeZone: 'America/Santiago' })
+											/*var minutes = fecha.getUTCMinutes();
 											if(minutes<10){
 												minutes = "0"+minutes;
 											}
 											fecha = fecha.getUTCMonth() + 1 + "/" + fecha.getUTCDate() + "/" + fecha.getUTCFullYear()+" "+fecha.getUTCHours()+":"+minutes;
+											*/
 											return fecha;
 										} else {
 											return "";
