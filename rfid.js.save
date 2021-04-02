@@ -1,0 +1,225 @@
+var express = require('express'),
+    app = express();
+    io = require('socket.io').listen("3000");
+var rc522 = require("rc522");
+var PythonShell = require('python-shell');
+ 
+
+var path = require('path');
+
+var bodyParser = require('body-parser');
+
+var mongoose = require('mongoose');
+
+mongoose.connect('mongodb://localhost/ayudantes');
+
+var AyudantesSchema = new mongoose.Schema({
+  acceso: {fecha:Date},
+  bloques: {bloque:String},
+  fechaRegistro: Date,
+  keyTarjeta: String,
+  mail: String,
+  matricula: String,
+  nombre: String,
+  rut: String,
+});
+
+var Ayudantes = mongoose.model('Ayudantes', AyudantesSchema);
+
+//console.log("App successfully launched!");
+
+app.use(bodyParser.urlencoded({ extended: false }));
+
+app.use(express.static(path.join(__dirname, 'public')));
+// Create a sample login page @ http://localhost:80
+//app.get('/', function(req, res){
+	//res.sendFile(__dirname + '/rfid2.html');
+//});
+
+app.get('/', function(req, res){
+	res.sendFile(__dirname + '/index.html');
+});
+
+app.get('/ayudantes', function(req, res, next) {
+	Ayudantes.find({},'',function (err, ayudantes) {
+	  if (err) return console.error(err);
+      
+	  var json1 = JSON.stringify({ 
+			data: ayudantes, 
+		  });
+	  
+	  res.send(json1);
+
+	});
+});
+
+app.get('/ayudantes2', function(req, res, next) {
+	Ayudantes.find({},'',function (err, ayudantes) {
+	  if (err) return console.error(err);
+      
+	  var json1 = JSON.stringify(
+			ayudantes
+		  );
+	  
+	  res.send(json1);
+
+	});
+});
+
+app.post('/delete', function(req, res, next) {
+		Ayudantes.remove({ keyTarjeta: req.body.keyTarjeta }, function(err) {
+			if (!err) {
+					var json1 = JSON.stringify({ 
+						data: 'Eliminado', 
+					  });			
+				}
+			else {
+					var json1 = JSON.stringify({ 
+						data: 'Error', 
+					  });
+					
+			}
+			res.send(json1);
+		});
+});
+
+var exec = require('child_process').exec;
+var cmd = 'omxplayer /home/pi/SISTEMA_NFC/Bleep-SoundBible.com-1927126940.mp3 > test.txt';
+
+
+
+// Everytime you tag in this will be triggered.
+rc522(function(rfidSerialNumber){
+//	console.log(rfidSerialNumber);
+	io.sockets.emit("rfid", rfidSerialNumber); // Sends the RFID Serial Number through Socket.IO
+  //	console.log(rfidSerialNumber);
+ 	
+//	console.log("Leido");
+//	console.log("Termino Update");
+	Ayudantes.findOneAndUpdate(
+    {"keyTarjeta":rfidSerialNumber},
+    {$push: {"acceso": {fecha: new Date()}}},
+    {safe: true, upsert: false},
+		function(err, model) {
+			//console.log(err);
+		}
+	);
+  //	console.log("Termino Update");
+	
+	exec(cmd, function(error, stdout, stderr) {
+		// command output is in stdout
+	});
+});
+
+// Guardar Ayudante
+// method post
+app.post('/registro', function(req, res, next) {  
+//	console.log("Solicitud de creacion de ayudante.");
+//	console.log(req.body.keycard);
+	Ayudantes.findOne({keyTarjeta:req.body.keycard},'_id nombre rut matricula mail keyTarjeta',function (err, ayudantes) {
+		if (err)return console.error(err);
+		if (ayudantes!=null){
+				var json1 = JSON.stringify({ 
+					data: "Tarjeta ya ha sido registrada", 
+				});
+				res.send(json1);
+		}
+		else{
+
+				
+			Ayudantes.create({
+				  keyTarjeta: req.body.keycard,
+				  mail: req.body.mail,
+				  matricula: req.body.matricula,
+				  nombre: req.body.nombreAyudante,
+				  rut: req.body.rut,
+				  fechaRegistro: new Date(),
+			}, function(err, todo){
+				if(err) {
+					res.send(err);
+				}
+				else{
+					var json1 = JSON.stringify({ 
+						data: "Ayudante Registrado", 
+					});
+
+					res.send(json1);
+				}
+			});
+		}
+	});
+});
+
+// Obtener Ayudantes y bloques
+// method get
+app.get('/obtener_ayudantes_bloques', function(req, res, next) {  
+//	console.log("Solicitud de creacion de ayudante.");
+//	console.log(req.body.keycard);
+	Ayudantes.find({},'nombre bloques',function (err, ayudantes) {
+		if (err) res.send(err);
+		if (ayudantes!=null){
+				var json1 = JSON.stringify(
+					ayudantes
+				);
+				//console.log(ayudantes);
+				res.send(json1);
+		}
+	});
+});
+
+// Obtener total de ayudantes
+// method get
+app.get('/contar_ayudantes', function(req, res, next) {
+//      console.log("contar ayudantes.");
+      Ayudantes.find().count(function(err, count) {
+                if (err) res.send(err);
+                if (count!=null){
+                                var json1 = JSON.stringify(
+                                     { data: count}
+                                );
+                                //console.log(count);
+                                res.send(json1);
+                }
+       
+      });
+});
+
+// Registrar Bloque para Ayudante
+// method post
+app.post('/registro_bloques', function(req, res, next) {  
+//	console.log("Solicitud de creacion de ayudante.");
+//	console.log(req.body.rutAyudante);
+//	console.log(req.body.bloque);
+	
+	Ayudantes.findOneAndUpdate(
+    {"rut":req.body.rutAyudante},
+    {$push: {"bloques": {bloque: req.body.bloque}}},
+    {safe: true, upsert: false},
+		function(err, model) {
+			//console.log(model);
+			res.send(err);
+		}
+	);
+});
+
+// Borrar Ayudantes de Bloque
+// method post
+app.post('/borrar_ayudantes', function(req, res, next) {  
+//	console.log("Solicitud de borrado de ayudantes de bloque.");
+//	console.log(req.body.bloque);
+
+	Ayudantes.update(
+      { "bloques" :{"bloque":req.body.bloque}},
+	  { "$pull" : { "bloques" :{"bloque":req.body.bloque}}},
+	  { multi:true}	,
+		function(err, model) {
+			//console.log(model);
+			var json = JSON.stringify({data:"bloque limpiado"});
+			res.send(json);
+		}
+	);
+});
+
+app.use('/rfid.png', express.static(__dirname + '/rfid.png')); 
+
+app.listen(80); // Setup your server port.
